@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": ["Edit:*", "Write:*", "Bash:*", "Read:*"]
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": ".*",
+        "hooks": [".claude/hooks/user-prompt-submit.js"]
+      }
+    ]
+  }
+}

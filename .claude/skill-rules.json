@@ -1,0 +1,24 @@
+{
+  "skills": {
+    "nextjs-dev": {
+      "description": "Next.js App Router patterns and best practices",
+      "keywords": ["component", "page.tsx", "route", "server action", "use client"],
+      "filePatterns": ["src/app/", "src/components/"]
+    },
+    "langgraph-dev": {
+      "description": "LangGraph pipeline and node development",
+      "keywords": ["langgraph", "node", "graph", "state", "streaming"],
+      "filePatterns": ["backend/", "graph.py", "state.py"]
+    },
+    "job-scraper": {
+      "description": "Job scraping patterns for Greenhouse/Lever/APIs",
+      "keywords": ["scrape", "fetch", "remotive", "usajobs", "greenhouse", "lever"],
+      "filePatterns": ["backend/nodes/fetch", "backend/nodes/scrape"]
+    },
+    "vercel-deploy": {
+      "description": "Vercel deployment and serverless functions",
+      "keywords": ["deploy", "vercel", "serverless", "cron", "environment"],
+      "filePatterns": ["vercel.json", "api/"]
+    }
+  }
+}
