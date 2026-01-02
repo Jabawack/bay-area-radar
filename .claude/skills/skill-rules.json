@@ -1,0 +1,145 @@
+{
+    "version": "1.0",
+    "description": "Skill activation triggers for Bay Area Radar job search dashboard",
+    "skills": {
+        "nextjs-dev": {
+            "type": "domain",
+            "enforcement": "suggest",
+            "priority": "high",
+            "description": "Next.js App Router patterns and best practices",
+            "promptTriggers": {
+                "keywords": [
+                    "component",
+                    "page.tsx",
+                    "route",
+                    "server action",
+                    "use client",
+                    "server component",
+                    "client component",
+                    "app router",
+                    "next.js",
+                    "nextjs"
+                ],
+                "intentPatterns": [
+                    "(create|add|build|make).*?(component|page|route)",
+                    "(how to|best practice).*?(next|react|component)",
+                    "(fix|debug).*?(component|page|rendering)"
+                ]
+            },
+            "fileTriggers": {
+                "pathPatterns": [
+                    "src/app/**/*.tsx",
+                    "src/app/**/*.ts",
+                    "src/components/**/*.tsx"
+                ],
+                "pathExclusions": [
+                    "**/*.test.tsx",
+                    "**/*.spec.tsx"
+                ]
+            }
+        },
+        "langgraph-dev": {
+            "type": "domain",
+            "enforcement": "suggest",
+            "priority": "high",
+            "description": "LangGraph pipeline and node development",
+            "promptTriggers": {
+                "keywords": [
+                    "langgraph",
+                    "graph",
+                    "node",
+                    "state",
+                    "streaming",
+                    "pipeline",
+                    "workflow",
+                    "agent"
+                ],
+                "intentPatterns": [
+                    "(create|add|build|implement).*?(node|graph|pipeline|state)",
+                    "(how to|how does).*?(langgraph|streaming|pipeline)",
+                    "(fix|debug).*?(graph|node|state)"
+                ]
+            },
+            "fileTriggers": {
+                "pathPatterns": [
+                    "backend/**/*.py",
+                    "backend/graph.py",
+                    "backend/state.py",
+                    "backend/nodes/**/*.py"
+                ]
+            }
+        },
+        "job-scraper": {
+            "type": "domain",
+            "enforcement": "suggest",
+            "priority": "high",
+            "description": "Job scraping patterns for Greenhouse/Lever/APIs",
+            "promptTriggers": {
+                "keywords": [
+                    "scrape",
+                    "fetch",
+                    "remotive",
+                    "usajobs",
+                    "greenhouse",
+                    "lever",
+                    "job api",
+                    "job listing",
+                    "job search"
+                ],
+                "intentPatterns": [
+                    "(scrape|fetch|get).*?(job|listing|posting)",
+                    "(add|implement).*?(scraper|fetcher)",
+                    "(how to|best practice).*?(scrape|fetch|api)"
+                ]
+            },
+            "fileTriggers": {
+                "pathPatterns": [
+                    "backend/nodes/fetch_*.py",
+                    "backend/nodes/scrape_*.py"
+                ]
+            }
+        },
+        "vercel-deploy": {
+            "type": "domain",
+            "enforcement": "suggest",
+            "priority": "medium",
+            "description": "Vercel deployment and serverless functions",
+            "promptTriggers": {
+                "keywords": [
+                    "deploy",
+                    "vercel",
+                    "serverless",
+                    "cron",
+                    "environment",
+                    "production",
+                    "hosting"
+                ],
+                "intentPatterns": [
+                    "(deploy|host|publish).*?(vercel|production)",
+                    "(setup|configure).*?(cron|environment|serverless)",
+                    "(how to|best practice).*?(deploy|vercel)"
+                ]
+            },
+            "fileTriggers": {
+                "pathPatterns": [
+                    "vercel.json",
+                    "api/**/*.py",
+                    ".env*"
+                ]
+            }
+        }
+    },
+    "notes": {
+        "enforcement_types": {
+            "suggest": "Skill suggestion appears but doesn't block execution",
+            "block": "Requires skill to be used before proceeding (guardrail)",
+            "warn": "Shows warning but allows proceeding"
+        },
+        "priority_levels": {
+            "critical": "Highest - Always trigger when matched",
+            "high": "Important - Trigger for most matches",
+            "medium": "Moderate - Trigger for clear matches",
+            "low": "Optional - Trigger only for explicit matches"
+        }
+    }
+}
