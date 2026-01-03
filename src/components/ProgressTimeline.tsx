@@ -1,48 +1,178 @@
 'use client';
 
-interface ProgressTimelineProps {
-  messages: string[];
-  isLoading: boolean;
-  errors: string[];
+import React from 'react';
+import {
+  Box,
+  Stepper,
+  Step,
+  StepLabel,
+  StepContent,
+  Typography,
+  CircularProgress,
+  Chip,
+  Collapse,
+  Alert,
+} from '@mui/material';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
+
+export interface ProgressStep {
+  node: string;
+  label: string;
+  status: 'pending' | 'running' | 'complete';
+  count?: number;
 }
 
-export function ProgressTimeline({ messages, isLoading, errors }: ProgressTimelineProps) {
-  if (!isLoading && messages.length === 0 && errors.length === 0) {
+interface ProgressTimelineProps {
+  steps: ProgressStep[];
+  isLoading: boolean;
+  errors: string[];
+  compact?: boolean;
+}
+
+const STEP_ORDER = [
+  'fetch_remotive',
+  'fetch_greenhouse',
+  'fetch_lever',
+  'merge_jobs',
+  'calculate_distance',
+];
+
+const STEP_LABELS: Record<string, string> = {
+  fetch_remotive: 'Remotive',
+  fetch_greenhouse: 'Greenhouse',
+  fetch_lever: 'Lever',
+  merge_jobs: 'Merge',
+  calculate_distance: 'Filter',
+};
+
+export const ProgressTimeline: React.FC<ProgressTimelineProps> = ({
+  steps,
+  isLoading,
+  errors,
+  compact = true,
+}) => {
+  if (!isLoading && steps.length === 0 && errors.length === 0) {
     return null;
   }
 
+  // Get active step index
+  const activeStep = steps.findIndex(s => s.status === 'running');
+  const completedSteps = steps.filter(s => s.status === 'complete').length;
+
+  if (compact) {
+    // Compact inline progress view
+    return (
+      <Collapse in={isLoading || errors.length > 0}>
+        <Box sx={{ mb: 2 }}>
+          {errors.length > 0 ? (
+            <Alert severity="error" sx={{ py: 0.5 }}>
+              {errors[0]}
+            </Alert>
+          ) : (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+              {isLoading && <CircularProgress size={16} />}
+              <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>
+                {isLoading ? 'Fetching:' : 'Complete:'}
+              </Typography>
+              {STEP_ORDER.map((nodeId) => {
+                const step = steps.find(s => s.node === nodeId);
+                const status = step?.status || 'pending';
+
+                return (
+                  <Chip
+                    key={nodeId}
+                    size="small"
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        {STEP_LABELS[nodeId]}
+                        {step?.count !== undefined && (
+                          <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                            ({step.count})
+                          </Typography>
+                        )}
+                      </Box>
+                    }
+                    icon={
+                      status === 'complete' ? (
+                        <CheckCircleIcon sx={{ fontSize: 16 }} />
+                      ) : status === 'running' ? (
+                        <CircularProgress size={12} />
+                      ) : (
+                        <RadioButtonUncheckedIcon sx={{ fontSize: 16 }} />
+                      )
+                    }
+                    color={status === 'complete' ? 'success' : status === 'running' ? 'primary' : 'default'}
+                    variant={status === 'pending' ? 'outlined' : 'filled'}
+                    sx={{
+                      '& .MuiChip-icon': {
+                        ml: 0.5,
+                        color: status === 'complete' ? 'success.main' : 'inherit'
+                      }
+                    }}
+                  />
+                );
+              })}
+            </Box>
+          )}
+        </Box>
+      </Collapse>
+    );
+  }
+
+  // Full stepper view (when compact=false)
   return (
-    <div className="bg-gray-50 rounded-lg p-4 mb-6">
-      <h3 className="font-semibold text-gray-700 mb-3">
-        {isLoading ? '🔄 Fetching Jobs...' : '✅ Fetch Complete'}
-      </h3>
+    <Collapse in={isLoading || steps.length > 0 || errors.length > 0}>
+      <Box sx={{ mb: 3, maxWidth: 400 }}>
+        <Stepper activeStep={activeStep >= 0 ? activeStep : completedSteps} orientation="vertical">
+          {STEP_ORDER.map((nodeId) => {
+            const step = steps.find(s => s.node === nodeId);
+            const status = step?.status || 'pending';
 
-      <div className="space-y-2">
-        {messages.map((message, index) => (
-          <div key={index} className="flex items-center gap-2 text-sm">
-            <span className="text-green-500">✓</span>
-            <span className="text-gray-600">{message}</span>
-          </div>
-        ))}
-
-        {isLoading && (
-          <div className="flex items-center gap-2 text-sm">
-            <span className="animate-spin">⏳</span>
-            <span className="text-gray-500">Processing...</span>
-          </div>
-        )}
+            return (
+              <Step key={nodeId} completed={status === 'complete'}>
+                <StepLabel
+                  StepIconComponent={() => (
+                    status === 'complete' ? (
+                      <CheckCircleIcon color="success" fontSize="small" />
+                    ) : status === 'running' ? (
+                      <CircularProgress size={20} />
+                    ) : (
+                      <RadioButtonUncheckedIcon color="disabled" fontSize="small" />
+                    )
+                  )}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    {STEP_LABELS[nodeId]}
+                    {step?.count !== undefined && (
+                      <Chip size="small" label={step.count} color="primary" />
+                    )}
+                  </Box>
+                </StepLabel>
+                {status === 'running' && (
+                  <StepContent>
+                    <Typography variant="caption" color="text.secondary">
+                      {step?.label || 'Processing...'}
+                    </Typography>
+                  </StepContent>
+                )}
+              </Step>
+            );
+          })}
+        </Stepper>
 
         {errors.length > 0 && (
-          <div className="mt-2 pt-2 border-t border-gray-200">
+          <Box sx={{ mt: 2 }}>
             {errors.map((error, index) => (
-              <div key={index} className="flex items-center gap-2 text-sm text-red-600">
-                <span>⚠️</span>
-                <span>{error}</span>
-              </div>
+              <Alert key={index} severity="error" sx={{ mb: 1 }}>
+                {error}
+              </Alert>
             ))}
-          </div>
+          </Box>
         )}
-      </div>
-    </div>
+      </Box>
+    </Collapse>
   );
-}
+};
+
+export default ProgressTimeline;
