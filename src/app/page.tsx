@@ -1,59 +1,127 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { Job, JobsResponse, FilterState, DEFAULT_FILTERS, HOME_LOCATION } from '@/lib/types';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
+import {
+  ThemeProvider,
+  createTheme,
+  CssBaseline,
+  Container,
+  AppBar,
+  Toolbar,
+  Typography,
+  Button,
+  Box,
+  Paper,
+  Grid,
+} from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import WorkIcon from '@mui/icons-material/Work';
+import { Job, FilterState, DEFAULT_FILTERS, HOME_LOCATION } from '@/lib/types';
 import { JobCard } from '@/components/JobCard';
 import { FilterBar } from '@/components/FilterBar';
-import { ProgressTimeline } from '@/components/ProgressTimeline';
+import { ProgressTimeline, ProgressStep } from '@/components/ProgressTimeline';
 
-export default function Dashboard() {
+const theme = createTheme({
+  palette: {
+    primary: {
+      main: '#1976d2',
+    },
+    background: {
+      default: '#f5f5f5',
+    },
+  },
+  typography: {
+    h5: {
+      fontWeight: 600,
+    },
+  },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          textTransform: 'none',
+        },
+      },
+    },
+  },
+});
+
+const Dashboard: React.FC = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [progress, setProgress] = useState<string[]>([]);
+  const [progressSteps, setProgressSteps] = useState<ProgressStep[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [lastFetched, setLastFetched] = useState<string | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
-  const fetchJobs = async () => {
+  const fetchJobs = useCallback(() => {
+    // Close any existing connection
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+    }
+
     setIsLoading(true);
-    setProgress([]);
+    setProgressSteps([]);
     setErrors([]);
 
-    try {
-      const response = await fetch('/api/jobs');
-      const data: JobsResponse = await response.json();
+    const eventSource = new EventSource('/api/jobs/stream');
+    eventSourceRef.current = eventSource;
 
-      if (data.success) {
-        setJobs(data.jobs);
-        setProgress(data.progress);
+    eventSource.addEventListener('progress', (event) => {
+      const data = JSON.parse(event.data);
+
+      setProgressSteps((prev) => {
+        const existing = prev.find((s) => s.node === data.node);
+        if (existing) {
+          return prev.map((s) =>
+            s.node === data.node
+              ? { ...s, status: data.type === 'complete' ? 'complete' : 'running', count: data.jobs_count, label: data.message }
+              : s
+          );
+        }
+        return [...prev, { node: data.node, label: data.message, status: data.type === 'complete' ? 'complete' : 'running', count: data.jobs_count }];
+      });
+    });
+
+    eventSource.addEventListener('complete', (event) => {
+      const data = JSON.parse(event.data);
+      setJobs(data.jobs || []);
+      setLastFetched(data.fetch_completed_at);
+      if (data.errors?.length) {
         setErrors(data.errors);
-        setLastFetched(data.fetch_completed_at);
-      } else {
-        setErrors([data.errors?.[0] || 'Failed to fetch jobs']);
       }
-    } catch (error) {
-      setErrors([`Network error: ${error instanceof Error ? error.message : 'Unknown error'}`]);
-    } finally {
       setIsLoading(false);
-    }
-  };
+      eventSource.close();
+    });
 
-  // Filter and sort jobs
+    eventSource.addEventListener('error', (event) => {
+      console.error('SSE error:', event);
+      setErrors(['Connection error. Please try again.']);
+      setIsLoading(false);
+      eventSource.close();
+    });
+
+    eventSource.onerror = () => {
+      // Connection closed or error
+      if (eventSource.readyState === EventSource.CLOSED) {
+        setIsLoading(false);
+      }
+    };
+  }, []);
+
   const filteredJobs = useMemo(() => {
     let result = jobs.filter((job) => {
-      // Work type filter
       if (!filters.workType.includes(job.work_type)) {
         return false;
       }
 
-      // Distance filter (for non-remote jobs)
       if (job.work_type !== 'remote' && job.distance_miles !== null) {
         if (job.distance_miles > filters.maxDistance) {
           return false;
         }
       }
 
-      // Search query
       if (filters.searchQuery) {
         const query = filters.searchQuery.toLowerCase();
         const searchable = [
@@ -71,7 +139,6 @@ export default function Dashboard() {
       return true;
     });
 
-    // Sort
     result.sort((a, b) => {
       switch (filters.sortBy) {
         case 'distance':
@@ -92,98 +159,108 @@ export default function Dashboard() {
     return result;
   }, [jobs, filters]);
 
+  const handleFilterChange = useCallback((newFilters: FilterState) => {
+    setFilters(newFilters);
+  }, []);
+
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                🎯 Bay Area Radar
-              </h1>
-              <p className="text-gray-500 mt-1">
-                Senior/Staff SWE jobs within {filters.maxDistance} miles of {HOME_LOCATION.city}
-              </p>
-            </div>
-            <div className="flex items-center gap-4">
-              {lastFetched && (
-                <span className="text-sm text-gray-400">
-                  Last updated: {new Date(lastFetched).toLocaleTimeString()}
-                </span>
-              )}
-              <button
-                onClick={fetchJobs}
-                disabled={isLoading}
-                className={`px-4 py-2 rounded-md font-medium transition-colors ${
-                  isLoading
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                }`}
-              >
-                {isLoading ? 'Fetching...' : '🔄 Fetch Jobs'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* Progress */}
-        <ProgressTimeline
-          messages={progress}
-          isLoading={isLoading}
-          errors={errors}
-        />
-
-        {/* Filters */}
-        <FilterBar
-          filters={filters}
-          onFilterChange={setFilters}
-          totalJobs={jobs.length}
-          filteredCount={filteredJobs.length}
-        />
-
-        {/* Job Listings */}
-        {jobs.length === 0 && !isLoading ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500 text-lg mb-4">
-              No jobs loaded yet. Click &quot;Fetch Jobs&quot; to start searching.
-            </p>
-            <button
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+        <AppBar position="static" elevation={1}>
+          <Toolbar>
+            <WorkIcon sx={{ mr: 1 }} />
+            <Typography variant="h6" component="h1" sx={{ flexGrow: 1 }}>
+              Bay Area Radar
+            </Typography>
+            {lastFetched && (
+              <Typography variant="caption" sx={{ mr: 2, opacity: 0.8 }}>
+                Updated: {new Date(lastFetched).toLocaleTimeString()}
+              </Typography>
+            )}
+            <Button
+              variant="contained"
+              color="inherit"
+              startIcon={<RefreshIcon />}
               onClick={fetchJobs}
-              className="px-6 py-3 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700"
+              disabled={isLoading}
+              sx={{ color: 'primary.main', bgcolor: 'white' }}
             >
-              🚀 Start Job Search
-            </button>
-          </div>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredJobs.map((job) => (
-              <JobCard key={`${job.source}-${job.source_id}`} job={job} />
-            ))}
-          </div>
-        )}
+              {isLoading ? 'Fetching...' : 'Fetch Jobs'}
+            </Button>
+          </Toolbar>
+        </AppBar>
 
-        {filteredJobs.length === 0 && jobs.length > 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-500">
-              No jobs match your current filters. Try adjusting your search criteria.
-            </p>
-          </div>
-        )}
-      </main>
+        <Container maxWidth="xl" sx={{ py: 3 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Senior/Staff SWE jobs within {filters.maxDistance} miles of {HOME_LOCATION.city}
+          </Typography>
 
-      {/* Footer */}
-      <footer className="bg-white border-t mt-12">
-        <div className="max-w-7xl mx-auto px-4 py-6 text-center text-gray-500 text-sm">
-          <p>
-            Data sources: Remotive, Greenhouse, Lever |
-            Home: {HOME_LOCATION.zip} ({HOME_LOCATION.city})
-          </p>
-        </div>
-      </footer>
-    </div>
+          <ProgressTimeline
+            steps={progressSteps}
+            isLoading={isLoading}
+            errors={errors}
+          />
+
+          <FilterBar
+            filters={filters}
+            onFilterChange={handleFilterChange}
+            totalJobs={jobs.length}
+            filteredCount={filteredJobs.length}
+          />
+
+          {jobs.length === 0 && !isLoading ? (
+            <Paper sx={{ p: 6, textAlign: 'center' }}>
+              <WorkIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
+              <Typography variant="h6" color="text.secondary" gutterBottom>
+                No jobs loaded yet
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                Click &quot;Fetch Jobs&quot; to start searching for opportunities
+              </Typography>
+              <Button
+                variant="contained"
+                size="large"
+                startIcon={<RefreshIcon />}
+                onClick={fetchJobs}
+              >
+                Start Job Search
+              </Button>
+            </Paper>
+          ) : (
+            <Grid container spacing={2}>
+              {filteredJobs.map((job) => (
+                <Grid key={`${job.source}-${job.source_id}`} size={{ xs: 12, md: 6, lg: 4 }}>
+                  <JobCard job={job} />
+                </Grid>
+              ))}
+            </Grid>
+          )}
+
+          {filteredJobs.length === 0 && jobs.length > 0 && (
+            <Paper sx={{ p: 4, textAlign: 'center', mt: 2 }}>
+              <Typography color="text.secondary">
+                No jobs match your current filters. Try adjusting your search criteria.
+              </Typography>
+            </Paper>
+          )}
+        </Container>
+
+        <Paper
+          component="footer"
+          square
+          elevation={0}
+          sx={{ py: 2, mt: 4, borderTop: 1, borderColor: 'divider' }}
+        >
+          <Container maxWidth="xl">
+            <Typography variant="body2" color="text.secondary" align="center">
+              Data sources: Remotive, Greenhouse, Lever | Home: {HOME_LOCATION.zip} ({HOME_LOCATION.city})
+            </Typography>
+          </Container>
+        </Paper>
+      </Box>
+    </ThemeProvider>
   );
-}
+};
+
+export default Dashboard;

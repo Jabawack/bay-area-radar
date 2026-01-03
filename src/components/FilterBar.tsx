@@ -1,5 +1,21 @@
 'use client';
 
+import React, { useCallback } from 'react';
+import {
+  Paper,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Typography,
+  Box,
+  InputAdornment,
+} from '@mui/material';
+import type { SelectChangeEvent } from '@mui/material';
+import SearchIcon from '@mui/icons-material/Search';
 import { FilterState } from '@/lib/types';
 
 interface FilterBarProps {
@@ -9,70 +25,125 @@ interface FilterBarProps {
   filteredCount: number;
 }
 
-export function FilterBar({ filters, onFilterChange, totalJobs, filteredCount }: FilterBarProps) {
-  const handleWorkTypeToggle = (type: 'remote' | 'hybrid' | 'onsite') => {
-    const current = filters.workType;
-    const updated = current.includes(type)
-      ? current.filter(t => t !== type)
-      : [...current, type];
+export const FilterBar: React.FC<FilterBarProps> = ({
+  filters,
+  onFilterChange,
+  totalJobs,
+  filteredCount,
+}) => {
+  const handleWorkTypeChange = useCallback(
+    (_event: React.MouseEvent<HTMLElement>, newWorkTypes: string[]) => {
+      if (newWorkTypes.length === 0) return;
+      onFilterChange({ ...filters, workType: newWorkTypes as ('remote' | 'hybrid' | 'onsite')[] });
+    },
+    [filters, onFilterChange]
+  );
 
-    // Don't allow empty selection
-    if (updated.length === 0) return;
+  const handleSearchChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      onFilterChange({ ...filters, searchQuery: event.target.value });
+    },
+    [filters, onFilterChange]
+  );
 
-    onFilterChange({ ...filters, workType: updated });
-  };
+  const handleSortChange = useCallback(
+    (event: SelectChangeEvent) => {
+      onFilterChange({ ...filters, sortBy: event.target.value as FilterState['sortBy'] });
+    },
+    [filters, onFilterChange]
+  );
 
   return (
-    <div className="bg-white rounded-lg shadow p-4 mb-6">
-      <div className="flex flex-wrap gap-4 items-center">
-        {/* Search */}
-        <div className="flex-1 min-w-[200px]">
-          <input
-            type="text"
-            placeholder="Search jobs..."
-            value={filters.searchQuery}
-            onChange={(e) => onFilterChange({ ...filters, searchQuery: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+    <Paper
+      sx={{
+        p: 2,
+        mb: 3,
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 2,
+        alignItems: 'center',
+      }}
+      elevation={1}
+    >
+      <TextField
+        placeholder="Search jobs..."
+        value={filters.searchQuery}
+        onChange={handleSearchChange}
+        size="small"
+        sx={{ flex: 1, minWidth: 200 }}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <SearchIcon color="action" />
+            </InputAdornment>
+          ),
+        }}
+      />
 
-        {/* Work Type Filter */}
-        <div className="flex gap-2">
-          {(['remote', 'hybrid', 'onsite'] as const).map((type) => (
-            <button
-              key={type}
-              onClick={() => handleWorkTypeToggle(type)}
-              className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                filters.workType.includes(type)
-                  ? type === 'remote'
-                    ? 'bg-green-500 text-white'
-                    : type === 'hybrid'
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-orange-500 text-white'
-                  : 'bg-gray-200 text-gray-600'
-              }`}
-            >
-              {type}
-            </button>
-          ))}
-        </div>
-
-        {/* Sort */}
-        <select
-          value={filters.sortBy}
-          onChange={(e) => onFilterChange({ ...filters, sortBy: e.target.value as FilterState['sortBy'] })}
-          className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+      <ToggleButtonGroup
+        value={filters.workType}
+        onChange={handleWorkTypeChange}
+        size="small"
+        color="primary"
+      >
+        <ToggleButton
+          value="remote"
+          sx={{
+            '&.Mui-selected': {
+              bgcolor: 'success.main',
+              color: 'white',
+              '&:hover': { bgcolor: 'success.dark' },
+            },
+          }}
         >
-          <option value="distance">Sort by Distance</option>
-          <option value="company">Sort by Company</option>
-          <option value="recent">Sort by Recent</option>
-        </select>
+          Remote
+        </ToggleButton>
+        <ToggleButton
+          value="hybrid"
+          sx={{
+            '&.Mui-selected': {
+              bgcolor: 'info.main',
+              color: 'white',
+              '&:hover': { bgcolor: 'info.dark' },
+            },
+          }}
+        >
+          Hybrid
+        </ToggleButton>
+        <ToggleButton
+          value="onsite"
+          sx={{
+            '&.Mui-selected': {
+              bgcolor: 'warning.main',
+              color: 'white',
+              '&:hover': { bgcolor: 'warning.dark' },
+            },
+          }}
+        >
+          Onsite
+        </ToggleButton>
+      </ToggleButtonGroup>
 
-        {/* Count */}
-        <div className="text-sm text-gray-500">
-          Showing {filteredCount} of {totalJobs} jobs
-        </div>
-      </div>
-    </div>
+      <FormControl size="small" sx={{ minWidth: 150 }}>
+        <InputLabel>Sort by</InputLabel>
+        <Select
+          value={filters.sortBy}
+          label="Sort by"
+          onChange={handleSortChange}
+        >
+          <MenuItem value="distance">Distance</MenuItem>
+          <MenuItem value="company">Company</MenuItem>
+          <MenuItem value="recent">Recent</MenuItem>
+        </Select>
+      </FormControl>
+
+      <Box sx={{ ml: 'auto' }}>
+        <Typography variant="body2" color="text.secondary">
+          {filteredCount} of {totalJobs} jobs
+        </Typography>
+      </Box>
+    </Paper>
   );
-}
+};
+
+export default FilterBar;

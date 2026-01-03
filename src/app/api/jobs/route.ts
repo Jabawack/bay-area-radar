@@ -16,9 +16,10 @@ export async function GET() {
 
       const cwd = process.cwd();
 
-      // Run the Python job fetcher
+      // Run the Python job fetcher (use full path to ensure correct Python)
+      const pythonPath = '/Users/tk/miniconda3/bin/python3';
       const { stdout, stderr } = await execAsync(
-        `cd "${cwd}" && python3 -c "
+        `cd "${cwd}" && ${pythonPath} -c "
 import asyncio
 import json
 import sys

@@ -1,102 +1,197 @@
 'use client';
 
+import React, { useCallback } from 'react';
+import {
+  Card,
+  CardContent,
+  Typography,
+  Chip,
+  Box,
+  Link,
+  Stack,
+} from '@mui/material';
+import type { SxProps, Theme } from '@mui/material';
 import { Job } from '@/lib/types';
 
 interface JobCardProps {
   job: Job;
 }
 
-export function JobCard({ job }: JobCardProps) {
-  const workTypeColors = {
-    remote: 'bg-green-100 text-green-800',
-    hybrid: 'bg-blue-100 text-blue-800',
-    onsite: 'bg-orange-100 text-orange-800',
-  };
+const styles: Record<string, SxProps<Theme>> = {
+  card: {
+    height: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    transition: 'box-shadow 0.2s, transform 0.2s',
+    '&:hover': {
+      boxShadow: 4,
+      transform: 'translateY(-2px)',
+    },
+  },
+  header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    mb: 1,
+  },
+  title: {
+    fontWeight: 600,
+    color: 'text.primary',
+    '&:hover': {
+      color: 'primary.main',
+    },
+    textDecoration: 'none',
+  },
+  company: {
+    color: 'text.secondary',
+    fontWeight: 500,
+  },
+  chipStack: {
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: 0.5,
+  },
+  skillChip: {
+    height: 24,
+    fontSize: '0.75rem',
+  },
+  salary: {
+    color: 'success.main',
+    fontWeight: 500,
+  },
+  footer: {
+    mt: 'auto',
+    pt: 2,
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+};
 
-  const sourceColors = {
-    remotive: 'bg-purple-100 text-purple-800',
-    greenhouse: 'bg-emerald-100 text-emerald-800',
-    lever: 'bg-cyan-100 text-cyan-800',
-    usajobs: 'bg-red-100 text-red-800',
-  };
+const workTypeColors: Record<string, 'success' | 'info' | 'warning'> = {
+  remote: 'success',
+  hybrid: 'info',
+  onsite: 'warning',
+};
+
+const sourceColors: Record<string, 'secondary' | 'success' | 'info' | 'error'> = {
+  remotive: 'secondary',
+  greenhouse: 'success',
+  lever: 'info',
+  usajobs: 'error',
+};
+
+export const JobCard: React.FC<JobCardProps> = ({ job }) => {
+  const handleViewJob = useCallback(() => {
+    window.open(job.url, '_blank', 'noopener,noreferrer');
+  }, [job.url]);
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow border border-gray-200">
-      <div className="flex justify-between items-start mb-3">
-        <div className="flex-1">
-          <h3 className="text-lg font-semibold text-gray-900 hover:text-blue-600">
-            <a href={job.url} target="_blank" rel="noopener noreferrer">
-              {job.title}
-            </a>
-          </h3>
-          <p className="text-gray-600 font-medium">{job.company}</p>
-        </div>
-        <div className="flex flex-col items-end gap-1">
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${workTypeColors[job.work_type]}`}>
-            {job.work_type}
-          </span>
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${sourceColors[job.source]}`}>
-            {job.source}
-          </span>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-2 mb-3">
-        <span className="text-sm text-gray-500">
-          📍 {job.location || 'Location not specified'}
-        </span>
-        {job.distance_miles !== null && job.work_type !== 'remote' && (
-          <span className="text-sm text-gray-500">
-            • {job.distance_miles} miles away
-          </span>
-        )}
-      </div>
-
-      {job.skills && job.skills.length > 0 && (
-        <div className="flex flex-wrap gap-1 mb-3">
-          {job.skills.slice(0, 6).map((skill, index) => (
-            <span
-              key={index}
-              className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs"
+    <Card sx={styles.card} variant="outlined">
+      <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <Box sx={styles.header}>
+          <Box sx={{ flex: 1, mr: 1 }}>
+            <Link
+              href={job.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              underline="hover"
+              sx={styles.title}
             >
-              {skill}
-            </span>
-          ))}
-          {job.skills.length > 6 && (
-            <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded text-xs">
-              +{job.skills.length - 6} more
-            </span>
+              <Typography variant="subtitle1" component="h3" sx={{ fontWeight: 600 }}>
+                {job.title}
+              </Typography>
+            </Link>
+            <Typography variant="body2" sx={styles.company}>
+              {job.company}
+            </Typography>
+          </Box>
+          <Stack sx={styles.chipStack}>
+            <Chip
+              label={job.work_type}
+              size="small"
+              color={workTypeColors[job.work_type] || 'default'}
+            />
+            <Chip
+              label={job.source}
+              size="small"
+              color={sourceColors[job.source] || 'default'}
+              variant="outlined"
+            />
+          </Stack>
+        </Box>
+
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          {job.location || 'Location not specified'}
+          {job.distance_miles !== null && job.work_type !== 'remote' && (
+            <> &bull; {job.distance_miles} mi</>
           )}
-        </div>
-      )}
+        </Typography>
 
-      {job.summary && (
-        <p className="text-sm text-gray-600 mb-3">{job.summary}</p>
-      )}
-
-      {(job.salary_min || job.salary_max) && (
-        <p className="text-sm font-medium text-green-600">
-          💰 {job.salary_min && `$${job.salary_min.toLocaleString()}`}
-          {job.salary_min && job.salary_max && ' - '}
-          {job.salary_max && `$${job.salary_max.toLocaleString()}`}
-        </p>
-      )}
-
-      <div className="mt-4 flex justify-between items-center">
-        <a
-          href={job.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-        >
-          View Job →
-        </a>
-        {job.posted_at && (
-          <span className="text-xs text-gray-400">
-            Posted: {new Date(job.posted_at).toLocaleDateString()}
-          </span>
+        {job.skills && job.skills.length > 0 && (
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
+            {job.skills.slice(0, 5).map((skill, index) => (
+              <Chip
+                key={index}
+                label={skill}
+                size="small"
+                variant="outlined"
+                sx={styles.skillChip}
+              />
+            ))}
+            {job.skills.length > 5 && (
+              <Chip
+                label={`+${job.skills.length - 5}`}
+                size="small"
+                sx={styles.skillChip}
+              />
+            )}
+          </Box>
         )}
-      </div>
-    </div>
+
+        {job.summary && (
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{
+              mb: 1,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+            }}
+          >
+            {job.summary}
+          </Typography>
+        )}
+
+        {(job.salary_min || job.salary_max) && (
+          <Typography variant="body2" sx={styles.salary}>
+            {job.salary_min && `$${job.salary_min.toLocaleString()}`}
+            {job.salary_min && job.salary_max && ' - '}
+            {job.salary_max && `$${job.salary_max.toLocaleString()}`}
+          </Typography>
+        )}
+
+        <Box sx={styles.footer}>
+          <Link
+            component="button"
+            variant="body2"
+            onClick={handleViewJob}
+            sx={{ cursor: 'pointer' }}
+          >
+            View Job →
+          </Link>
+          {job.posted_at && (
+            <Typography variant="caption" color="text.disabled">
+              {new Date(job.posted_at).toLocaleDateString()}
+            </Typography>
+          )}
+        </Box>
+      </CardContent>
+    </Card>
   );
-}
+};
+
+export default JobCard;

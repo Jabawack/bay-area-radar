@@ -1,36 +1,59 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Bay Area Radar
+
+Job search dashboard for Senior/Staff Software Engineering positions in the Bay Area.
+
+## Features
+
+- Real-time job aggregation from Remotive, Greenhouse, and Lever
+- Distance filtering from 95118 (Almaden, San Jose) - 25 mile commute radius
+- Filter by work type: Remote, Hybrid, Onsite
+- Search and sort functionality
+- LangGraph-powered job processing pipeline
+
+## Prerequisites
+
+- Node.js 18+
+- Python 3.10+ with miniconda/conda
+- Python packages: `pip install langgraph langchain httpx pydantic beautifulsoup4`
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+# Install dependencies
+npm install
+
+# Run development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) and click "Fetch Jobs" to start.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+bay-area-radar/
+├── src/app/           # Next.js pages and API routes
+├── src/components/    # React components
+├── backend/           # Python LangGraph pipeline
+│   ├── graph.py       # Main pipeline
+│   ├── state.py       # State definitions
+│   └── nodes/         # Job fetcher nodes
+├── .claude/           # Claude Code skills infrastructure
+└── dev/               # Dev docs (context persistence)
+```
 
-## Learn More
+## Data Sources
 
-To learn more about Next.js, take a look at the following resources:
+- **Remotive**: Remote jobs API (free)
+- **Greenhouse**: 18 Bay Area startups (Discord, Figma, Stripe, etc.)
+- **Lever**: 15 Bay Area companies (Netflix, Coinbase, etc.)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Deploy
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+vercel deploy
+```
 
-## Deploy on Vercel
+## License
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT
