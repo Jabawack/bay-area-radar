@@ -55,7 +55,10 @@ const Dashboard: React.FC = () => {
   const [lastFetched, setLastFetched] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
 
-  const fetchJobs = useCallback(() => {
+  // Check if we're in production (Vercel)
+  const isProduction = typeof window !== 'undefined' && window.location.hostname !== 'localhost';
+
+  const fetchJobsStreaming = useCallback(() => {
     // Close any existing connection
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
@@ -95,20 +98,65 @@ const Dashboard: React.FC = () => {
       eventSource.close();
     });
 
-    eventSource.addEventListener('error', (event) => {
-      console.error('SSE error:', event);
-      setErrors(['Connection error. Please try again.']);
-      setIsLoading(false);
+    eventSource.addEventListener('error', () => {
+      // Streaming failed - fallback to regular fetch
       eventSource.close();
+      fetchJobsRegular();
     });
 
     eventSource.onerror = () => {
-      // Connection closed or error
       if (eventSource.readyState === EventSource.CLOSED) {
         setIsLoading(false);
       }
     };
   }, []);
+
+  const fetchJobsRegular = useCallback(async () => {
+    setIsLoading(true);
+    setProgressSteps([]);
+    setErrors([]);
+
+    // Show simple progress for non-streaming
+    setProgressSteps([
+      { node: 'fetch_remotive', label: 'Fetching...', status: 'running' },
+    ]);
+
+    try {
+      const response = await fetch('/api/jobs');
+      const data = await response.json();
+
+      if (data.success) {
+        setJobs(data.jobs || []);
+        setLastFetched(data.fetch_completed_at);
+        // Mark all steps complete
+        setProgressSteps([
+          { node: 'fetch_remotive', label: 'Remotive', status: 'complete', count: data.jobs?.filter((j: Job) => j.source === 'remotive').length },
+          { node: 'fetch_greenhouse', label: 'Greenhouse', status: 'complete', count: data.jobs?.filter((j: Job) => j.source === 'greenhouse').length },
+          { node: 'fetch_lever', label: 'Lever', status: 'complete', count: data.jobs?.filter((j: Job) => j.source === 'lever').length },
+          { node: 'merge_jobs', label: 'Merged', status: 'complete', count: data.total_found },
+          { node: 'calculate_distance', label: 'Filtered', status: 'complete', count: data.total_filtered },
+        ]);
+        if (data.errors?.length) {
+          setErrors(data.errors);
+        }
+      } else {
+        setErrors([data.error || 'Failed to fetch jobs']);
+      }
+    } catch (error) {
+      setErrors([`Network error: ${error instanceof Error ? error.message : 'Unknown error'}`]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Use streaming in dev, regular fetch in production
+  const fetchJobs = useCallback(() => {
+    if (isProduction) {
+      fetchJobsRegular();
+    } else {
+      fetchJobsStreaming();
+    }
+  }, [isProduction, fetchJobsRegular, fetchJobsStreaming]);
 
   const filteredJobs = useMemo(() => {
     let result = jobs.filter((job) => {
