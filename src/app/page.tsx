@@ -46,6 +46,8 @@ const theme = createTheme({
   },
 });
 
+const JOBS_PER_PAGE = 20;
+
 const Dashboard: React.FC = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -53,6 +55,7 @@ const Dashboard: React.FC = () => {
   const [errors, setErrors] = useState<string[]>([]);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [lastFetched, setLastFetched] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(JOBS_PER_PAGE);
   const eventSourceRef = useRef<EventSource | null>(null);
   const hasErroredRef = useRef(false); // Prevent infinite error loop
 
@@ -86,15 +89,26 @@ const Dashboard: React.FC = () => {
       const data = await response.json();
 
       if (data.success) {
-        setJobs(data.jobs || []);
+        // Dedupe jobs by source + source_id
+        const jobsArray = data.jobs || [];
+        const seen = new Set<string>();
+        const dedupedJobs = jobsArray.filter((job: Job) => {
+          const key = `${job.source}-${job.source_id}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+
+        setJobs(dedupedJobs);
         setLastFetched(data.fetch_completed_at);
+        setVisibleCount(JOBS_PER_PAGE); // Reset pagination
         // Mark all steps complete
         setProgressSteps([
-          { node: 'fetch_remotive', label: 'Remotive', status: 'complete', count: data.jobs?.filter((j: Job) => j.source === 'remotive').length },
-          { node: 'fetch_greenhouse', label: 'Greenhouse', status: 'complete', count: data.jobs?.filter((j: Job) => j.source === 'greenhouse').length },
-          { node: 'fetch_lever', label: 'Lever', status: 'complete', count: data.jobs?.filter((j: Job) => j.source === 'lever').length },
+          { node: 'fetch_remotive', label: 'Remotive', status: 'complete', count: dedupedJobs.filter((j: Job) => j.source === 'remotive').length },
+          { node: 'fetch_greenhouse', label: 'Greenhouse', status: 'complete', count: dedupedJobs.filter((j: Job) => j.source === 'greenhouse').length },
+          { node: 'fetch_lever', label: 'Lever', status: 'complete', count: dedupedJobs.filter((j: Job) => j.source === 'lever').length },
           { node: 'merge_jobs', label: 'Merged', status: 'complete', count: data.total_found },
-          { node: 'calculate_distance', label: 'Filtered', status: 'complete', count: data.total_filtered },
+          { node: 'calculate_distance', label: 'Filtered', status: 'complete', count: dedupedJobs.length },
         ]);
         if (data.errors?.length) {
           setErrors(data.errors);
@@ -144,8 +158,19 @@ const Dashboard: React.FC = () => {
 
     eventSource.addEventListener('complete', (event) => {
       const data = JSON.parse(event.data);
-      setJobs(data.jobs || []);
+      // Dedupe jobs
+      const jobsArray = data.jobs || [];
+      const seen = new Set<string>();
+      const dedupedJobs = jobsArray.filter((job: Job) => {
+        const key = `${job.source}-${job.source_id}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      setJobs(dedupedJobs);
       setLastFetched(data.fetch_completed_at);
+      setVisibleCount(JOBS_PER_PAGE);
       if (data.errors?.length) {
         setErrors(data.errors);
       }
@@ -182,6 +207,11 @@ const Dashboard: React.FC = () => {
 
   const filteredJobs = useMemo(() => {
     let result = jobs.filter((job) => {
+      // Filter out jobs with missing essential data
+      if (!job.title?.trim() || !job.company?.trim()) {
+        return false;
+      }
+
       if (!filters.workType.includes(job.work_type)) {
         return false;
       }
@@ -231,7 +261,19 @@ const Dashboard: React.FC = () => {
 
   const handleFilterChange = useCallback((newFilters: FilterState) => {
     setFilters(newFilters);
+    setVisibleCount(JOBS_PER_PAGE); // Reset pagination on filter change
   }, []);
+
+  const loadMore = useCallback(() => {
+    setVisibleCount((prev) => prev + JOBS_PER_PAGE);
+  }, []);
+
+  // Jobs to display (limited for performance)
+  const displayedJobs = useMemo(() => {
+    return filteredJobs.slice(0, visibleCount);
+  }, [filteredJobs, visibleCount]);
+
+  const hasMoreJobs = filteredJobs.length > visibleCount;
 
   return (
     <ThemeProvider theme={theme}>
@@ -298,13 +340,22 @@ const Dashboard: React.FC = () => {
               </Button>
             </Paper>
           ) : (
-            <Grid container spacing={2}>
-              {filteredJobs.map((job) => (
-                <Grid key={`${job.source}-${job.source_id}`} size={{ xs: 12, md: 6, lg: 4 }}>
-                  <JobCard job={job} />
-                </Grid>
-              ))}
-            </Grid>
+            <>
+              <Grid container spacing={2}>
+                {displayedJobs.map((job) => (
+                  <Grid key={`${job.source}-${job.source_id}`} size={{ xs: 12, md: 6, lg: 4 }}>
+                    <JobCard job={job} />
+                  </Grid>
+                ))}
+              </Grid>
+              {hasMoreJobs && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                  <Button variant="outlined" onClick={loadMore}>
+                    Load More ({filteredJobs.length - visibleCount} remaining)
+                  </Button>
+                </Box>
+              )}
+            </>
           )}
 
           {filteredJobs.length === 0 && jobs.length > 0 && (

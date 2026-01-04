@@ -81,7 +81,7 @@ const sourceColors: Record<string, 'secondary' | 'success' | 'info' | 'error'> =
   usajobs: 'error',
 };
 
-export const JobCard: React.FC<JobCardProps> = ({ job }) => {
+export const JobCard: React.FC<JobCardProps> = React.memo(({ job }) => {
   const handleViewJob = useCallback(() => {
     window.open(job.url, '_blank', 'noopener,noreferrer');
   }, [job.url]);
@@ -192,6 +192,8 @@ export const JobCard: React.FC<JobCardProps> = ({ job }) => {
       </CardContent>
     </Card>
   );
-};
+});
+
+JobCard.displayName = 'JobCard';
 
 export default JobCard;
