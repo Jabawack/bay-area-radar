@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   ThemeProvider,
   createTheme,
@@ -54,59 +54,19 @@ const Dashboard: React.FC = () => {
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [lastFetched, setLastFetched] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const hasErroredRef = useRef(false); // Prevent infinite error loop
 
-  // Check if we're in production (Vercel)
-  const isProduction = typeof window !== 'undefined' && window.location.hostname !== 'localhost';
+  // Check if we're in production (Vercel) - memoize to prevent recalculation
+  const isProduction = useMemo(() => {
+    return typeof window !== 'undefined' && window.location.hostname !== 'localhost';
+  }, []);
 
-  const fetchJobsStreaming = useCallback(() => {
-    // Close any existing connection
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-    }
-
-    setIsLoading(true);
-    setProgressSteps([]);
-    setErrors([]);
-
-    const eventSource = new EventSource('/api/jobs/stream');
-    eventSourceRef.current = eventSource;
-
-    eventSource.addEventListener('progress', (event) => {
-      const data = JSON.parse(event.data);
-
-      setProgressSteps((prev) => {
-        const existing = prev.find((s) => s.node === data.node);
-        if (existing) {
-          return prev.map((s) =>
-            s.node === data.node
-              ? { ...s, status: data.type === 'complete' ? 'complete' : 'running', count: data.jobs_count, label: data.message }
-              : s
-          );
-        }
-        return [...prev, { node: data.node, label: data.message, status: data.type === 'complete' ? 'complete' : 'running', count: data.jobs_count }];
-      });
-    });
-
-    eventSource.addEventListener('complete', (event) => {
-      const data = JSON.parse(event.data);
-      setJobs(data.jobs || []);
-      setLastFetched(data.fetch_completed_at);
-      if (data.errors?.length) {
-        setErrors(data.errors);
-      }
-      setIsLoading(false);
-      eventSource.close();
-    });
-
-    eventSource.addEventListener('error', () => {
-      // Streaming failed - fallback to regular fetch
-      eventSource.close();
-      fetchJobsRegular();
-    });
-
-    eventSource.onerror = () => {
-      if (eventSource.readyState === EventSource.CLOSED) {
-        setIsLoading(false);
+  // Cleanup EventSource on unmount
+  useEffect(() => {
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
       }
     };
   }, []);
@@ -148,6 +108,68 @@ const Dashboard: React.FC = () => {
       setIsLoading(false);
     }
   }, []);
+
+  const fetchJobsStreaming = useCallback(() => {
+    // Close any existing connection
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+
+    // Reset error flag for new fetch
+    hasErroredRef.current = false;
+
+    setIsLoading(true);
+    setProgressSteps([]);
+    setErrors([]);
+
+    const eventSource = new EventSource('/api/jobs/stream');
+    eventSourceRef.current = eventSource;
+
+    eventSource.addEventListener('progress', (event) => {
+      const data = JSON.parse(event.data);
+
+      setProgressSteps((prev) => {
+        const existing = prev.find((s) => s.node === data.node);
+        if (existing) {
+          return prev.map((s) =>
+            s.node === data.node
+              ? { ...s, status: data.type === 'complete' ? 'complete' : 'running', count: data.jobs_count, label: data.message }
+              : s
+          );
+        }
+        return [...prev, { node: data.node, label: data.message, status: data.type === 'complete' ? 'complete' : 'running', count: data.jobs_count }];
+      });
+    });
+
+    eventSource.addEventListener('complete', (event) => {
+      const data = JSON.parse(event.data);
+      setJobs(data.jobs || []);
+      setLastFetched(data.fetch_completed_at);
+      if (data.errors?.length) {
+        setErrors(data.errors);
+      }
+      setIsLoading(false);
+      eventSource.close();
+      eventSourceRef.current = null;
+    });
+
+    // Single error handler - prevent infinite loop with flag
+    eventSource.onerror = () => {
+      // Only handle error once to prevent infinite reconnection loop
+      if (hasErroredRef.current) {
+        return;
+      }
+      hasErroredRef.current = true;
+
+      // Close and cleanup
+      eventSource.close();
+      eventSourceRef.current = null;
+
+      // Fallback to regular fetch
+      fetchJobsRegular();
+    };
+  }, [fetchJobsRegular]); // Include fetchJobsRegular in deps
 
   // Use streaming in dev, regular fetch in production
   const fetchJobs = useCallback(() => {

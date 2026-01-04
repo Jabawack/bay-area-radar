@@ -52,18 +52,18 @@ export const ProgressTimeline: React.FC<ProgressTimelineProps> = ({
   errors,
   compact = true,
 }) => {
-  if (!isLoading && steps.length === 0 && errors.length === 0) {
-    return null;
-  }
-
   // Get active step index
   const activeStep = steps.findIndex(s => s.status === 'running');
   const completedSteps = steps.filter(s => s.status === 'complete').length;
+  const hasCompletedSteps = completedSteps > 0;
+  
+  // Keep visible when loading, has steps (completed or running), or has errors
+  const shouldShow = isLoading || steps.length > 0 || errors.length > 0;
 
   if (compact) {
     // Compact inline progress view
     return (
-      <Collapse in={isLoading || errors.length > 0}>
+      <Collapse in={shouldShow}>
         <Box sx={{ mb: 2 }}>
           {errors.length > 0 ? (
             <Alert severity="error" sx={{ py: 0.5 }}>
@@ -73,7 +73,7 @@ export const ProgressTimeline: React.FC<ProgressTimelineProps> = ({
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
               {isLoading && <CircularProgress size={16} />}
               <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>
-                {isLoading ? 'Fetching:' : 'Complete:'}
+                {isLoading ? 'Fetching:' : hasCompletedSteps ? 'Complete:' : 'Ready:'}
               </Typography>
               {STEP_ORDER.map((nodeId) => {
                 const step = steps.find(s => s.node === nodeId);
@@ -122,7 +122,7 @@ export const ProgressTimeline: React.FC<ProgressTimelineProps> = ({
 
   // Full stepper view (when compact=false)
   return (
-    <Collapse in={isLoading || steps.length > 0 || errors.length > 0}>
+    <Collapse in={shouldShow}>
       <Box sx={{ mb: 3, maxWidth: 400 }}>
         <Stepper activeStep={activeStep >= 0 ? activeStep : completedSteps} orientation="vertical">
           {STEP_ORDER.map((nodeId) => {
